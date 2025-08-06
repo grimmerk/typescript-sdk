@@ -9,10 +9,10 @@ import { Transport } from "../shared/transport.js";
  *
  * This transport is only available in Node.js environments.
  */
-export class StdioServerTransport implements Transport {
+export class StdioServerTransport<TCustomContext = Record<string, unknown>> implements Transport<TCustomContext> {
   private _readBuffer: ReadBuffer = new ReadBuffer();
   private _started = false;
-  private _customContext?: Record<string, unknown>;
+  private _customContext?: TCustomContext;
 
   constructor(
     private _stdin: Readable = process.stdin,
@@ -21,7 +21,7 @@ export class StdioServerTransport implements Transport {
 
   onclose?: () => void;
   onerror?: (error: Error) => void;
-  onmessage?: (message: JSONRPCMessage, extra?: MessageExtraInfo) => void;
+  onmessage?: (message: JSONRPCMessage, extra?: MessageExtraInfo<TCustomContext>) => void;
 
   // Arrow functions to bind `this` properly, while maintaining function identity.
   _ondata = (chunk: Buffer) => {
@@ -56,7 +56,7 @@ export class StdioServerTransport implements Transport {
         }
 
         // Pass custom context to message handlers
-        const extra: MessageExtraInfo = {
+        const extra: MessageExtraInfo<TCustomContext> = {
           customContext: this._customContext
         };
         this.onmessage?.(message, extra);
@@ -98,7 +98,7 @@ export class StdioServerTransport implements Transport {
   /**
    * Sets custom context data that will be passed to all message handlers.
    */
-  setCustomContext(context: Record<string, unknown>): void {
+  setCustomContext(context: TCustomContext): void {
     this._customContext = context;
   }
 }

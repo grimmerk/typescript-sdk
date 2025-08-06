@@ -1,0 +1,89 @@
+// 這是一個範例，展示如何加入 generic type for customContext
+
+import { AuthInfo } from "./server/auth/types.js";
+
+/**
+ * Extra information about a message with generic custom context type.
+ */
+export interface MessageExtraInfo<TCustomContext = Record<string, unknown>> {
+  /**
+   * The request information.
+   */
+  requestInfo?: RequestInfo;
+  /**
+   * The authentication information.
+   */
+  authInfo?: AuthInfo;
+  /**
+   * Custom context data that can be passed through the message handling pipeline.
+   * This allows transport implementations to attach arbitrary data that will be
+   * available to request handlers.
+   */
+  customContext?: TCustomContext;
+}
+
+/**
+ * Extra data given to request handlers with generic custom context type.
+ */
+export type RequestHandlerExtra<
+  SendRequestT extends Request,
+  SendNotificationT extends Notification,
+  TCustomContext = Record<string, unknown>
+> = {
+  signal: AbortSignal;
+  authInfo?: AuthInfo;
+  sessionId?: string;
+  _meta?: RequestMeta;
+  requestId: RequestId;
+  requestInfo?: RequestInfo;
+  customContext?: TCustomContext;
+  sendNotification: (notification: SendNotificationT) => Promise<void>;
+  sendRequest: <U extends ZodType<object>>(
+    request: SendRequestT,
+    resultSchema: U,
+    options?: RequestOptions
+  ) => Promise<z.infer<U>>;
+};
+
+// Transport interface with generic
+export interface Transport<TCustomContext = Record<string, unknown>> {
+  // ... existing properties ...
+  
+  /**
+   * Sets custom context data that will be passed to all message handlers.
+   * This context will be included in the MessageExtraInfo passed to handlers.
+   */
+  setCustomContext?: (context: TCustomContext) => void;
+  
+  /**
+   * Callback for when a message (request or response) is received over the connection.
+   */
+  onmessage?: (message: JSONRPCMessage, extra?: MessageExtraInfo<TCustomContext>) => void;
+}
+
+// 使用範例：
+interface MyCustomContext {
+  tenantId: string;
+  userId: string;
+  featureFlags: {
+    betaMode: boolean;
+    debugMode: boolean;
+  };
+}
+
+// 在你的程式碼中
+const transport = new SSEServerTransport<MyCustomContext>('/messages', res.raw);
+transport.setCustomContext({
+  tenantId: "tenant-123",
+  userId: "user-456",
+  featureFlags: {
+    betaMode: true,
+    debugMode: false
+  }
+});
+
+// 在 tool handler 中
+server.tool('search', async ({ query }, extra: RequestHandlerExtra<ServerRequest, ServerNotification, MyCustomContext>) => {
+  const tenantId = extra.customContext?.tenantId; // TypeScript knows this is string
+  const betaMode = extra.customContext?.featureFlags.betaMode; // TypeScript knows this is boolean
+});

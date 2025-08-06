@@ -1,0 +1,100 @@
+import { Client } from './dist/client/index.js';
+import { Server } from './dist/server/index.js';
+import { InMemoryTransport } from './dist/inMemory.js';
+
+async function testCustomContext() {
+  // 創建 server
+  const server = new Server({
+    name: 'test-server',
+    version: '1.0.0'
+  }, {
+    capabilities: {
+      tools: {}
+    }
+  });
+
+  // 註冊一個 tool 來接收 custom context
+  server.setRequestHandler({
+    method: 'tools/call',
+    handler: async (request, extra) => {
+      console.log('=== Tool Handler Received ===');
+      console.log('Request params:', request.params);
+      console.log('Custom context:', extra.customContext);
+      console.log('Request ID:', extra.requestId);
+      
+      return {
+        content: [{
+          type: 'text',
+          text: `Received context: ${JSON.stringify(extra.customContext)}`
+        }]
+      };
+    }
+  });
+
+  // 創建 client
+  const client = new Client({
+    name: 'test-client',
+    version: '1.0.0'
+  }, {
+    capabilities: {}
+  });
+
+  // 創建 transport pair
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+
+  // 修改 client transport 來注入 custom context
+  const originalSend = clientTransport.send.bind(clientTransport);
+  clientTransport.send = async (message, options) => {
+    console.log('\n=== Client Sending Message ===');
+    console.log('Method:', message.method);
+    
+    const enhancedOptions = {
+      ...options,
+      customContext: {
+        tenantId: 'tenant-123',
+        userId: 'user-456',
+        features: {
+          betaMode: true,
+          debugMode: true
+        },
+        timestamp: new Date().toISOString()
+      }
+    };
+    
+    console.log('Injecting custom context:', enhancedOptions.customContext);
+    return originalSend(message, enhancedOptions);
+  };
+
+  // 連接
+  await Promise.all([
+    client.connect(clientTransport),
+    server.connect(serverTransport)
+  ]);
+
+  console.log('\n=== Connection established ===\n');
+
+  // 發送 tool call request
+  try {
+    const result = await client.request({
+      method: 'tools/call',
+      params: {
+        name: 'test-tool',
+        arguments: {
+          input: 'Hello from client!'
+        }
+      }
+    });
+
+    console.log('\n=== Client Received Result ===');
+    console.log('Result:', result);
+  } catch (error) {
+    console.error('Error:', error);
+  }
+
+  // 關閉連接
+  await client.close();
+  await server.close();
+}
+
+// 執行測試
+testCustomContext().catch(console.error);

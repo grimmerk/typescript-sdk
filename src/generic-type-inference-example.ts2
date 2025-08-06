@@ -1,0 +1,58 @@
+// 展示如何讓 generic type 自動推斷
+
+// 假設我們修改 Transport 和 Server 來支援 generic
+interface Transport<TCustomContext = Record<string, unknown>> {
+  setCustomContext?: (context: TCustomContext) => void;
+  onmessage?: (message: any, extra?: MessageExtraInfo<TCustomContext>) => void;
+}
+
+interface MessageExtraInfo<TCustomContext = Record<string, unknown>> {
+  customContext?: TCustomContext;
+  // other fields...
+}
+
+// Server 也需要 generic
+class Server<TCustomContext = Record<string, unknown>> {
+  async connect(transport: Transport<TCustomContext>): Promise<void> {
+    // transport 的 type 會傳遞到 server
+  }
+  
+  // tool 方法也需要傳遞 generic
+  tool<TArgs>(
+    name: string,
+    params: TArgs,
+    callback: (args: TArgs, extra: RequestHandlerExtra<any, any, TCustomContext>) => any
+  ): void {
+    // callback 會自動推斷 TCustomContext
+  }
+}
+
+// 使用範例
+interface MyCustomContext {
+  tenantId: string;
+  userId: string;
+}
+
+// 創建 transport 時指定 type
+const transport = new SSEServerTransport<MyCustomContext>('/messages', res);
+transport.setCustomContext({
+  tenantId: "123",
+  userId: "456"
+}); // TypeScript 會檢查型別
+
+// 創建 server 時也要指定相同的 type
+const server = new Server<MyCustomContext>();
+await server.connect(transport);
+
+// 這裡的 extra 會自動推斷為 RequestHandlerExtra<any, any, MyCustomContext>
+server.tool('search', {}, async (args, extra) => {
+  const tenantId = extra.customContext?.tenantId; // TypeScript knows this is string!
+});
+
+// 問題是：如果要自動推斷，需要修改很多地方：
+// 1. Transport interface 需要 generic
+// 2. Server/McpServer class 需要 generic
+// 3. Protocol class 需要 generic
+// 4. 所有相關的 type definitions 都需要加上 generic
+
+// 這會是一個相當大的改動，可能會造成 breaking changes

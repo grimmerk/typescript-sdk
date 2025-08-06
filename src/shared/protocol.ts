@@ -108,8 +108,11 @@ export type NotificationOptions = {
 /**
  * Extra data given to request handlers.
  */
-export type RequestHandlerExtra<SendRequestT extends Request,
-  SendNotificationT extends Notification> = {
+export type RequestHandlerExtra<
+  SendRequestT extends Request,
+  SendNotificationT extends Notification,
+  TCustomContext = Record<string, unknown>
+> = {
     /**
      * An abort signal used to communicate if the request was cancelled from the sender's side.
      */
@@ -146,7 +149,7 @@ export type RequestHandlerExtra<SendRequestT extends Request,
      * This allows transport implementations to attach arbitrary data that will be
      * available to request handlers.
      */
-    customContext?: Record<string, unknown>;
+    customContext?: TCustomContext;
 
     /**
      * Sends a notification that relates to the current request being handled.
@@ -183,14 +186,15 @@ export abstract class Protocol<
   SendRequestT extends Request,
   SendNotificationT extends Notification,
   SendResultT extends Result,
+  TCustomContext = Record<string, unknown>
 > {
-  private _transport?: Transport;
+  private _transport?: Transport<TCustomContext>;
   private _requestMessageId = 0;
   private _requestHandlers: Map<
     string,
     (
       request: JSONRPCRequest,
-      extra: RequestHandlerExtra<SendRequestT, SendNotificationT>,
+      extra: RequestHandlerExtra<SendRequestT, SendNotificationT, TCustomContext>,
     ) => Promise<SendResultT>
   > = new Map();
   private _requestHandlerAbortControllers: Map<RequestId, AbortController> =
@@ -226,7 +230,7 @@ export abstract class Protocol<
    */
   fallbackRequestHandler?: (
     request: JSONRPCRequest,
-    extra: RequestHandlerExtra<SendRequestT, SendNotificationT>
+    extra: RequestHandlerExtra<SendRequestT, SendNotificationT, TCustomContext>
   ) => Promise<SendResultT>;
 
   /**
@@ -302,7 +306,7 @@ export abstract class Protocol<
    *
    * The Protocol object assumes ownership of the Transport, replacing any callbacks that have already been set, and expects that it is the only user of the Transport instance going forward.
    */
-  async connect(transport: Transport): Promise<void> {
+  async connect(transport: Transport<TCustomContext>): Promise<void> {
     this._transport = transport;
     const _onclose = this.transport?.onclose;
     this._transport.onclose = () => {
@@ -373,7 +377,7 @@ export abstract class Protocol<
       );
   }
 
-  private _onrequest(request: JSONRPCRequest, extra?: MessageExtraInfo): void {
+  private _onrequest(request: JSONRPCRequest, extra?: MessageExtraInfo<TCustomContext>): void {
     const handler =
       this._requestHandlers.get(request.method) ?? this.fallbackRequestHandler;
 
@@ -401,7 +405,7 @@ export abstract class Protocol<
     const abortController = new AbortController();
     this._requestHandlerAbortControllers.set(request.id, abortController);
 
-    const fullExtra: RequestHandlerExtra<SendRequestT, SendNotificationT> = {
+    const fullExtra: RequestHandlerExtra<SendRequestT, SendNotificationT, TCustomContext> = {
       signal: abortController.signal,
       sessionId: capturedTransport?.sessionId,
       _meta: request.params?._meta,
@@ -716,7 +720,7 @@ export abstract class Protocol<
     requestSchema: T,
     handler: (
       request: z.infer<T>,
-      extra: RequestHandlerExtra<SendRequestT, SendNotificationT>,
+      extra: RequestHandlerExtra<SendRequestT, SendNotificationT, TCustomContext>,
     ) => SendResultT | Promise<SendResultT>,
   ): void {
     const method = requestSchema.shape.method.value;

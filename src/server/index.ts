@@ -76,10 +76,12 @@ export class Server<
   RequestT extends Request = Request,
   NotificationT extends Notification = Notification,
   ResultT extends Result = Result,
+  TCustomContext = Record<string, unknown>
 > extends Protocol<
   ServerRequest | RequestT,
   ServerNotification | NotificationT,
-  ServerResult | ResultT
+  ServerResult | ResultT,
+  TCustomContext
 > {
   private _clientCapabilities?: ClientCapabilities;
   private _clientVersion?: Implementation;

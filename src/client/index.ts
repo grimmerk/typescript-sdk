@@ -82,10 +82,12 @@ export class Client<
   RequestT extends Request = Request,
   NotificationT extends Notification = Notification,
   ResultT extends Result = Result,
+  TCustomContext = Record<string, unknown>
 > extends Protocol<
   ClientRequest | RequestT,
   ClientNotification | NotificationT,
-  ClientResult | ResultT
+  ClientResult | ResultT,
+  TCustomContext
 > {
   private _serverCapabilities?: ServerCapabilities;
   private _serverVersion?: Implementation;
@@ -132,7 +134,7 @@ export class Client<
     }
   }
 
-  override async connect(transport: Transport, options?: RequestOptions): Promise<void> {
+  override async connect(transport: Transport<TCustomContext>, options?: RequestOptions): Promise<void> {
     await super.connect(transport);
     // When transport sessionId is already set this means we are trying to reconnect.
     // In this case we don't need to initialize again.

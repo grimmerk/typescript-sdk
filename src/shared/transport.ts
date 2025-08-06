@@ -28,7 +28,7 @@ export type TransportSendOptions = {
 /**
  * Describes the minimal contract for a MCP transport that a client or server can communicate over.
  */
-export interface Transport {
+export interface Transport<TCustomContext = Record<string, unknown>> {
   /**
    * Starts processing messages on the transport, including any connection steps that might need to be taken.
    *
@@ -71,7 +71,7 @@ export interface Transport {
    *
    * The requestInfo can be used to get the original request information (headers, etc.)
    */
-  onmessage?: (message: JSONRPCMessage, extra?: MessageExtraInfo) => void;
+  onmessage?: (message: JSONRPCMessage, extra?: MessageExtraInfo<TCustomContext>) => void;
 
   /**
    * The session ID generated for this connection.
@@ -87,5 +87,5 @@ export interface Transport {
    * Sets custom context data that will be passed to all message handlers.
    * This context will be included in the MessageExtraInfo passed to handlers.
    */
-  setCustomContext?: (context: Record<string, unknown>) => void;
+  setCustomContext?: (context: TCustomContext) => void;
 }

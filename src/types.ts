@@ -1502,7 +1502,7 @@ export interface RequestInfo {
 /**
  * Extra information about a message.
  */
-export interface MessageExtraInfo {
+export interface MessageExtraInfo<TCustomContext = Record<string, unknown>> {
   /**
    * The request information.
    */
@@ -1518,7 +1518,7 @@ export interface MessageExtraInfo {
    * This allows transport implementations to attach arbitrary data that will be
    * available to request handlers.
    */
-  customContext?: Record<string, unknown>;
+  customContext?: TCustomContext;
 }
 
 /* JSON-RPC types */

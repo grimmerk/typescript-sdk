@@ -37,14 +37,14 @@ export interface SSEServerTransportOptions {
  *
  * This transport is only available in Node.js environments.
  */
-export class SSEServerTransport implements Transport {
+export class SSEServerTransport<TCustomContext = Record<string, unknown>> implements Transport<TCustomContext> {
   private _sseResponse?: ServerResponse;
   private _sessionId: string;
   private _options: SSEServerTransportOptions;
-  private _customContext?: Record<string, unknown>;
+  private _customContext?: TCustomContext;
   onclose?: () => void;
   onerror?: (error: Error) => void;
-  onmessage?: (message: JSONRPCMessage, extra?: MessageExtraInfo) => void;
+  onmessage?: (message: JSONRPCMessage, extra?: MessageExtraInfo<TCustomContext>) => void;
 
   /**
    * Creates a new SSE server transport, which will direct the client to POST messages to the relative or absolute URL identified by `_endpoint`.
@@ -183,7 +183,7 @@ export class SSEServerTransport implements Transport {
   /**
    * Handle a client message, regardless of how it arrived. This can be used to inform the server of messages that arrive via a means different than HTTP POST.
    */
-  async handleMessage(message: unknown, extra?: MessageExtraInfo): Promise<void> {
+  async handleMessage(message: unknown, extra?: MessageExtraInfo<TCustomContext>): Promise<void> {
     let parsedMessage: JSONRPCMessage;
     try {
       parsedMessage = JSONRPCMessageSchema.parse(message);
@@ -193,7 +193,7 @@ export class SSEServerTransport implements Transport {
     }
 
     // Merge custom context with the extra info
-    const enhancedExtra: MessageExtraInfo = {
+    const enhancedExtra: MessageExtraInfo<TCustomContext> = {
       ...extra,
       customContext: this._customContext
     };
@@ -228,7 +228,7 @@ export class SSEServerTransport implements Transport {
   /**
    * Sets custom context data that will be passed to all message handlers.
    */
-  setCustomContext(context: Record<string, unknown>): void {
+  setCustomContext(context: TCustomContext): void {
     this._customContext = context;
   }
 }

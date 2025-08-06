@@ -1,0 +1,55 @@
+import { describe, expect, test } from "@jest/globals";
+import { PassThrough } from "stream";
+import { StdioServerTransport } from "./stdio.js";
+import { JSONRPCMessage } from "../types.js";
+
+describe("StdioServerTransport custom context", () => {
+  test("should pass customContext to message handlers", async () => {
+    // Create mock stdin/stdout streams
+    const stdin = new PassThrough();
+    const stdout = new PassThrough();
+    
+    const transport = new StdioServerTransport(stdin as any, stdout as any);
+    
+    // Set custom context
+    const customContext = {
+      tenantId: "test-tenant-123",
+      userId: "user-456",
+      features: { beta: true }
+    };
+    transport.setCustomContext(customContext);
+    
+    // Track received messages
+    let receivedMessage: JSONRPCMessage | undefined;
+    let receivedExtra: any;
+    
+    transport.onmessage = (message, extra) => {
+      receivedMessage = message;
+      receivedExtra = extra;
+    };
+    
+    // Start the transport
+    await transport.start();
+    
+    // Send a test message through stdin
+    const testMessage: JSONRPCMessage = {
+      jsonrpc: "2.0",
+      method: "test",
+      params: { foo: "bar" },
+      id: 1
+    };
+    
+    // Write message in the stdio format (JSON followed by newline)
+    const messageStr = JSON.stringify(testMessage) + "\n";
+    stdin.write(messageStr);
+    
+    // Wait for message to be processed
+    await new Promise(resolve => setTimeout(resolve, 10));
+    
+    // Verify the message was received with custom context
+    expect(receivedMessage).toEqual(testMessage);
+    expect(receivedExtra?.customContext).toEqual(customContext);
+    
+    await transport.close();
+  });
+});

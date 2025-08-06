@@ -2,30 +2,30 @@ import { Transport } from "./shared/transport.js";
 import { JSONRPCMessage, RequestId, MessageExtraInfo } from "./types.js";
 import { AuthInfo } from "./server/auth/types.js";
 
-interface QueuedMessage {
+interface QueuedMessage<TCustomContext = Record<string, unknown>> {
   message: JSONRPCMessage;
-  extra?: MessageExtraInfo;
+  extra?: MessageExtraInfo<TCustomContext>;
 }
 
 /**
  * In-memory transport for creating clients and servers that talk to each other within the same process.
  */
-export class InMemoryTransport implements Transport {
-  private _otherTransport?: InMemoryTransport;
-  private _messageQueue: QueuedMessage[] = [];
-  private _customContext?: Record<string, unknown>;
+export class InMemoryTransport<TCustomContext = Record<string, unknown>> implements Transport<TCustomContext> {
+  private _otherTransport?: InMemoryTransport<TCustomContext>;
+  private _messageQueue: QueuedMessage<TCustomContext>[] = [];
+  private _customContext?: TCustomContext;
 
   onclose?: () => void;
   onerror?: (error: Error) => void;
-  onmessage?: (message: JSONRPCMessage, extra?: MessageExtraInfo) => void;
+  onmessage?: (message: JSONRPCMessage, extra?: MessageExtraInfo<TCustomContext>) => void;
   sessionId?: string;
 
   /**
    * Creates a pair of linked in-memory transports that can communicate with each other. One should be passed to a Client and one to a Server.
    */
-  static createLinkedPair(): [InMemoryTransport, InMemoryTransport] {
-    const clientTransport = new InMemoryTransport();
-    const serverTransport = new InMemoryTransport();
+  static createLinkedPair<TCustomContext = Record<string, unknown>>(): [InMemoryTransport<TCustomContext>, InMemoryTransport<TCustomContext>] {
+    const clientTransport = new InMemoryTransport<TCustomContext>();
+    const serverTransport = new InMemoryTransport<TCustomContext>();
     clientTransport._otherTransport = serverTransport;
     serverTransport._otherTransport = clientTransport;
     return [clientTransport, serverTransport];
@@ -36,7 +36,7 @@ export class InMemoryTransport implements Transport {
     while (this._messageQueue.length > 0) {
       const queuedMessage = this._messageQueue.shift()!;
       // Merge custom context with queued extra info
-      const enhancedExtra: MessageExtraInfo = {
+      const enhancedExtra: MessageExtraInfo<TCustomContext> = {
         ...queuedMessage.extra,
         customContext: this._customContext
       };
@@ -57,19 +57,19 @@ export class InMemoryTransport implements Transport {
    * 
    * @deprecated The authInfo parameter is deprecated. Use MessageExtraInfo instead.
    */
-  async send(message: JSONRPCMessage, options?: { relatedRequestId?: RequestId, authInfo?: AuthInfo } | MessageExtraInfo): Promise<void> {
+  async send(message: JSONRPCMessage, options?: { relatedRequestId?: RequestId, authInfo?: AuthInfo } | MessageExtraInfo<TCustomContext>): Promise<void> {
     if (!this._otherTransport) {
       throw new Error("Not connected");
     }
 
     // Handle both old and new API formats
-    let extra: MessageExtraInfo | undefined;
+    let extra: MessageExtraInfo<TCustomContext> | undefined;
     if (options && 'authInfo' in options && !('requestInfo' in options)) {
       // Old API format - convert to new format
       extra = { authInfo: options.authInfo };
     } else if (options && ('requestInfo' in options || 'customContext' in options || 'authInfo' in options)) {
       // New API format
-      extra = options as MessageExtraInfo;
+      extra = options as MessageExtraInfo<TCustomContext>;
     } else if (options && 'authInfo' in options) {
       // Old API with authInfo
       extra = { authInfo: options.authInfo };
@@ -77,7 +77,7 @@ export class InMemoryTransport implements Transport {
 
     if (this._otherTransport.onmessage) {
       // Merge the other transport's custom context with the extra info
-      const enhancedExtra: MessageExtraInfo = {
+      const enhancedExtra: MessageExtraInfo<TCustomContext> = {
         ...extra,
         customContext: this._otherTransport._customContext
       };
@@ -90,7 +90,7 @@ export class InMemoryTransport implements Transport {
   /**
    * Sets custom context data that will be passed to all message handlers.
    */
-  setCustomContext(context: Record<string, unknown>): void {
+  setCustomContext(context: TCustomContext): void {
     this._customContext = context;
   }
 }

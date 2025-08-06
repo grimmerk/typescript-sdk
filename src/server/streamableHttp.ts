@@ -127,7 +127,7 @@ export interface StreamableHTTPServerTransportOptions {
  * - No Session ID is included in any responses
  * - No session validation is performed
  */
-export class StreamableHTTPServerTransport implements Transport {
+export class StreamableHTTPServerTransport<TCustomContext = Record<string, unknown>> implements Transport<TCustomContext> {
   // when sessionId is not set (undefined), it means the transport is in stateless mode
   private sessionIdGenerator: (() => string) | undefined;
   private _started: boolean = false;
@@ -143,12 +143,12 @@ export class StreamableHTTPServerTransport implements Transport {
   private _allowedHosts?: string[];
   private _allowedOrigins?: string[];
   private _enableDnsRebindingProtection: boolean;
-  private _customContext?: Record<string, unknown>;
+  private _customContext?: TCustomContext;
 
   sessionId?: string;
   onclose?: () => void;
   onerror?: (error: Error) => void;
-  onmessage?: (message: JSONRPCMessage, extra?: MessageExtraInfo) => void;
+  onmessage?: (message: JSONRPCMessage, extra?: MessageExtraInfo<TCustomContext>) => void;
 
   constructor(options: StreamableHTTPServerTransportOptions) {
     this.sessionIdGenerator = options.sessionIdGenerator;
@@ -488,7 +488,7 @@ export class StreamableHTTPServerTransport implements Transport {
 
         // handle each message
         for (const message of messages) {
-          const enhancedExtra: MessageExtraInfo = {
+          const enhancedExtra: MessageExtraInfo<TCustomContext> = {
             authInfo,
             requestInfo,
             customContext: this._customContext
@@ -528,7 +528,7 @@ export class StreamableHTTPServerTransport implements Transport {
 
         // handle each message
         for (const message of messages) {
-          const enhancedExtra: MessageExtraInfo = {
+          const enhancedExtra: MessageExtraInfo<TCustomContext> = {
             authInfo,
             requestInfo,
             customContext: this._customContext
@@ -763,7 +763,7 @@ export class StreamableHTTPServerTransport implements Transport {
   /**
    * Sets custom context data that will be passed to all message handlers.
    */
-  setCustomContext(context: Record<string, unknown>): void {
+  setCustomContext(context: TCustomContext): void {
     this._customContext = context;
   }
 }
